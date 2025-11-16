@@ -1,0 +1,185 @@
+---
+title: "ANOVA exercise"
+author: "Lucia Caroli"
+date: "2025-11-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+```
+
+## Loading the data
+The dataset contains records for 287 individuals of known parentage, where larval host and maternal host plants were recorded, along with development time, growth rate and adult weight of the individuals. Hosts are plants of Barbarea (Bb) or Berteroa (Bt) genus.
+```{r data_loading, echo=TRUE}
+df = read.csv("C:/Users/lu1280ca/Work Folders/Downloads/butterflies.csv", sep = ",")
+df$MaternalHost = paste0(df$MaternalHost, "M")
+df$LarvalHost = paste0(df$LarvalHost, "L")
+```
+
+## ANOVA models
+Test the effect of LarvalHost, MaternalHost and their interaction on the three response variables (DevelopmentTime, GrowthRate, AdultWeight).
+```{r anova_models, echo=TRUE}
+aw = lm(df$AdultWeight~df$LarvalHost*df$MaternalHost)
+gr = lm(df$GrowthRate~df$LarvalHost*df$MaternalHost)
+dt = lm(df$DevelopmentTime~df$LarvalHost*df$MaternalHost)
+
+```
+
+## Assumptions
+Check that assumptions are met:
+
+* Residuals are normally distributed
+```{r resid, echo=TRUE, warning=FALSE}
+par(mfrow=c(1,3))
+plot(density(aw$residuals),main="Adult Weight ANOVA residuals")
+plot(density(gr$residuals),main="Growth Rate ANOVA residuals")
+plot(density(dt$residuals), main="Development Time ANOVA residuals")
+```
+
+The residuals of dt do not appear to be normally distributed. The curve has two humps.
+
+* Homogeneity of variance across the groups
+```{r var, echo=TRUE}
+par(mfrow=c(2,2))
+plot(aw,main="Adult Weight ANOVA")
+plot(gr,main="Growth Rate ANOVA")
+plot(dt, main="Development Time ANOVA")
+```
+
+In the ANOVA for Development time (dt), looking at the fitted vs residuals plot, the variance does not look homogeneous, as the vertical variation is not equally "spread". Taking the log() and sqrt() does not "fix" the appearance of the data (i.e., the two humps remain). Development time probably needs to be transformed in some other way in order to be analysed with ANOVA.
+
+## ANOVA tables and summaries
+```{r}
+anova(aw)
+summary(aw)
+anova(gr)
+summary(gr)
+```
+
+## Plots
+
+```{r boxplots, echo=T, warning=FALSE}
+ggplot(df, aes(x = LarvalHost,
+               y = AdultWeight,
+               fill = MaternalHost,
+               )) +
+  geom_boxplot(position = position_dodge(width = 0.9),
+               outlier.shape = NA) +
+  geom_jitter(position = position_jitterdodge(
+                 jitter.width = 0.15,
+                 jitter.height = 0,
+                 dodge.width = 0.9),
+              alpha = 0.7,
+              size = 2,
+              shape = 1) +
+  scale_fill_manual(values = c("coral", "turquoise"),
+                    labels = c("Barbarea", "Berteroa")) +
+  scale_x_discrete(labels = c("Barbarea", "Berteroa"))+
+  guides(fill = guide_legend(title = "Maternal Host"),
+         color = "none") +
+  theme_classic(base_size = 14) +
+  theme(legend.position = c(0.20, 0.20)) +
+  labs(
+    x = "Larval Host Plant",
+    y = "Adult weight (mg)"
+  )
+
+ggplot(df, aes(x = LarvalHost,
+               y = GrowthRate,
+               fill = MaternalHost,
+               )) +
+  geom_boxplot(position = position_dodge(width = 0.9),
+               outlier.shape = NA) +
+  geom_jitter(position = position_jitterdodge(
+                 jitter.width = 0.15,
+                 jitter.height = 0,
+                 dodge.width = 0.9),
+              alpha = 0.7,
+              size = 2,
+              shape = 1) +
+  scale_fill_manual(values = c("coral", "turquoise"),
+                    labels = c("Barbarea", "Berteroa")) +
+  scale_x_discrete(labels = c("Barbarea", "Berteroa"))+
+  guides(fill = guide_legend(title = "Maternal Host"),
+         color = "none") +
+  theme_classic(base_size = 14) +
+  theme(legend.position = c(0.20, 0.20)) +
+  labs(
+    x = "Larval Host Plant",
+    y = "Growth rate"
+  )
+```
+
+
+
+```{r means_plots, warning=FALSE, message=FALSE}
+means_aw = df %>%
+  group_by(LarvalHost, MaternalHost) %>%
+  summarise(
+    mean = mean(AdultWeight, na.rm = TRUE),
+    se   = sd(AdultWeight, na.rm = TRUE) / sqrt(n())
+  )
+
+ggplot(means_aw, aes(x = LarvalHost,
+                  y = mean,
+                  linetype = MaternalHost,
+                  group = MaternalHost,
+                  shape = MaternalHost)) +
+  geom_point(size = 3)+
+  scale_shape_manual(values = c(1,19))+
+  geom_line() +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
+                width = 0.15) +
+  scale_x_discrete(labels = c("Barbarea", "Berteroa"))+
+  scale_shape_manual(values = c(1, 19), 
+                     labels = c("Barbarea", "Berteroa")) +
+  scale_linetype_manual(values = c("solid", "dashed"), 
+                        labels = c("Barbarea", "Berteroa")) +
+  theme_classic(base_size = 14) +
+  theme(legend.position = c(0.20, 0.20))+
+  labs(
+    title = "Maternal and Larval Host effect on Adult weight",
+    x = "Larval Host",
+    y = "Mean Adult weight (mg)",
+    color = "Maternal Host"
+  )
+means_gr = df %>%
+  group_by(LarvalHost, MaternalHost) %>%
+  summarise(
+    mean = mean(GrowthRate, na.rm = TRUE),
+    se   = sd(GrowthRate, na.rm = TRUE) / sqrt(n())
+  )
+ggplot(means_gr, aes(x = LarvalHost,
+                  y = mean,
+                  linetype = MaternalHost,
+                  group = MaternalHost,
+                  shape = MaternalHost)) +
+  geom_point(size = 3)+
+  scale_shape_manual(values = c(1,19))+
+  geom_line() +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
+                width = 0.15) +
+  theme_classic(base_size = 14) +
+  scale_x_discrete(labels = c("Barbarea", "Berteroa"))+
+  theme(legend.position = c(0.20, 0.20))+
+  scale_shape_manual(values = c(1, 19), 
+                     labels = c("Barbarea", "Berteroa")) +
+  scale_linetype_manual(values = c("solid", "dashed"), 
+                        labels = c("Barbarea", "Berteroa")) +
+  labs(
+    title = "Maternal and Larval Host effect on Growth Rate",
+    x = "Larval Host",
+    y = "Mean Growth Rate",
+    color = "Maternal Host"
+  )
+```
+
+
+
+
+
+
